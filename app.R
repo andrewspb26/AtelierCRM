@@ -5,8 +5,8 @@ library(ggplot2)
 library(pool)
 
 
-source("C:\\shiny_apps\\test\\dsh\\dsh\\module\\insertRow.R", local=TRUE)
-
+source("C:\\AtelierCRM\\module\\insertRow.R", local=TRUE)
+source("C:\\AtelierCRM\\module\\updateSelector.R", local=TRUE)
 
 global_pool <- dbPool(RSQLite::SQLite(), dbname = "C:\\sqlite\\sqlite-tools\\skiniyaCRM.db")
 
@@ -31,17 +31,19 @@ ui <- dashboardPage(skin = 'purple',
                 actionButton("create_client", ' добавить клиента', icon = icon('address-book'))
               )), 
               fluidRow(box(title='Мерки', width = 12, status = 'primary', collapsible=TRUE, collapsed = TRUE,
-                           column(width=4, uiOutput("customer_selector1")),
-                           column(width=2, textInput("height", "рост:")),
-                           column(width=2, textInput("chest_girth", "обхват груди:")),
-                           column(width=2, textInput("sleeve_length", "длина рукава:")),
-                           column(width=2, textInput("neck_girth", "обхват шеи:")),
-                           column(width=2, textInput("waist", "талия:")),
-                           column(width=2, textInput("biceps_girth", "обхват бицепса:")),
-                           column(width=2, textInput("head_girth", "обхват головы:")),
-                           column(width=2, textInput("wrist_girth", "обхват запястья:")),
-                           column(width=2, textInput("shoulder", "плечо:")),
-                           column(width=2, textInput("notes", "заметки:"))
+                           fluidRow(
+                             column(width=4, uiOutput("customer_selector1")),
+                             column(width=2, textInput("height", "рост:")),
+                             column(width=2, textInput("chest_girth", "обхват груди:")),
+                             column(width=2, textInput("sleeve_length", "длина рукава:")),
+                             column(width=2, textInput("neck_girth", "обхват шеи:"))),
+                           fluidRow(column(width=2, textInput("waist", "талия:")),
+                             column(width=2, textInput("biceps_girth", "обхват бицепса:")),
+                             column(width=2, textInput("head_girth", "обхват головы:")),
+                             column(width=2, textInput("wrist_girth", "обхват запястья:")),
+                             column(width=2, textInput("shoulder", "плечо:")),
+                             column(width=2, textInput("notes", "заметки:"))),
+                           fluidRow(actionButton("create_measurements", ' добавить мерки', icon = icon('address-book')))
                            )),
               fluidRow(box(title = 'Клиенты', width = 12, status = "info", 
                   DT::dataTableOutput("client_table")))
@@ -66,7 +68,7 @@ ui <- dashboardPage(skin = 'purple',
 
 server <- function(input, output) {
   
-  client_list <- c(global_pool %>% tbl("clients") %>% select(name) %>% collect(),recursive = TRUE, use.names=FALSE)
+  client_list <- updateSelector('clients', 'name')
   
   output$customer_selector1 <- renderUI({
     selectInput('customer1', label='имя клиента', choices = client_list)
@@ -77,7 +79,6 @@ server <- function(input, output) {
   })
   
   output$client_table <- DT::renderDataTable(DT::datatable({
-    #insertRow(pool, 'clients', input)
     data <- mpg
     data
   }), options = list(scrollX = TRUE))
@@ -88,8 +89,13 @@ server <- function(input, output) {
   }), options = list(scrollX = TRUE))
     
   observeEvent(input$create_client, {
-      print("here")
       insertRow(global_pool, 'clients', input)
+      client_list <<- updateSelector('clients', 'name')
+  })
+  
+  observeEvent(input$create_order, {
+    insertRow(global_pool, 'orders', input)
+    #client_list <<- updateSelector('orders', 'items')
   })
   
 }
