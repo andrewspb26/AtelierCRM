@@ -15,6 +15,7 @@ ui <- dashboardPage(skin = 'purple',
   dashboardHeader(title='Atelier CRM'),
   dashboardSidebar(
     sidebarMenu(
+                menuItem("Статистика", tabName = "clients", icon = icon("calculator")),
                 menuItem("Клиенты", tabName = "clients", icon = icon("address-book")),
                 menuItem("Заказы", tabName = "orders", icon = icon("archive"))
     )
@@ -67,16 +68,16 @@ ui <- dashboardPage(skin = 'purple',
   )
 )
 
-server <- function(input, output) {
+server <- function(input, output, session) {
   
   client_list <- updateSelector('clients', 'name') 
   order_list <- updateSelector('orders', 'none', all=TRUE)
   
-  output$customer_selector1 <- renderUI({ # need to change name according to table
+  output$customer_selector1 <- renderUI({
     selectInput('client_name', label='имя клиента', choices = client_list)
   })
   
-  output$customer_selector2 <- renderUI({ # need to change name according to table
+  output$customer_selector2 <- renderUI({
     selectInput('user_name', label='имя клиента', choices = client_list)
   })
   
@@ -105,11 +106,17 @@ server <- function(input, output) {
   observeEvent(input$create_client, {
       insertRow(global_pool, 'clients', input)
       client_list <<- updateSelector('clients', 'name')
+      updateTextInput(session, "name", value = '')     
+      updateTextInput(session, "address", value = '')
+      updateTextInput(session, "email", value = '') 
   })
   
   observeEvent(input$create_order, {
-    insertRow(global_pool, 'orders', input)
-    order_list <<- updateSelector('orders', 'none', all=TRUE)
+    if (input$price != ''){
+      insertRow(global_pool, 'orders', input)
+      order_list <<- updateSelector('orders', 'none', all=TRUE)
+      updateTextInput(session, "price", value = '')
+      }
   })
   
   observeEvent(input$create_measurements, {

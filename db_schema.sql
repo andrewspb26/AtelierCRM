@@ -5,7 +5,8 @@ create table clients (
   id integer PRIMARY KEY AUTOINCREMENT,
   name text,
   address text,
-  email text
+  email text,
+  created_at datetime default current_timestamp
   
 );
 
@@ -35,6 +36,7 @@ create table orders (
   item text,
   material text,
   color text,
-  price integer
+  price integer,
+  created_at datetime default current_timestamp
   
 );
