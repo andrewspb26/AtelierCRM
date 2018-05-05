@@ -11,7 +11,7 @@ create table clients (
 
 create table measurements (
 
-  client_name integer, 
+  client_name text, 
   height integer,
   chest_girth integer,
   sleeve_length integer,
@@ -28,7 +28,7 @@ create table measurements (
 create table orders (
 
   order_id integer PRIMARY KEY AUTOINCREMENT,
-  user_name integer,
+  user_name text,
   started_at text,
   finished_at text,
   tracking_code text,

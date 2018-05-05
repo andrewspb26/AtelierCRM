@@ -42,23 +42,24 @@ ui <- dashboardPage(skin = 'purple',
                              column(width=2, textInput("head_girth", "обхват головы:")),
                              column(width=2, textInput("wrist_girth", "обхват запястья:")),
                              column(width=2, textInput("shoulder", "плечо:")),
-                             column(width=2, textInput("notes", "заметки:"))),
-                           fluidRow(actionButton("create_measurements", ' добавить мерки', icon = icon('address-book')))
+                             column(width=2, textInput("notes", "заметки:")))
                            )),
+              fluidRow(box(width = 4, status = 'primary', 
+                           actionButton("create_measurements", ' добавить мерки', icon = icon('user-edit')))),
               fluidRow(box(title = 'Клиенты', width = 12, status = "info", 
                   DT::dataTableOutput("client_table")))
       ),
       tabItem(tabName = 'orders',
               fluidRow(box(title = 'Новый заказ',  width = 12, status = 'warning', collapsible = TRUE,
                            column(width=4, uiOutput("customer_selector2")),
-                           column(width=2, selectInput('item', label='вещь', choices = c('облачение', 'покровцы'))),
-                           column(width=2, selectInput('material', label='материал', choices = c('шелк', 'парча'))),
-                           column(width=2, selectInput('color', label='цвет', choices = c('зеленый', 'красный'))),
+                           column(width=2, uiOutput("item_selector")),
+                           column(width=2, uiOutput("material_selector")),
+                           column(width=2, uiOutput("color_selector")),
                            column(width=2, textInput('price', label='цена'))
                            )
               ),
               fluidRow(box(width = 4, status = 'warning', 
-                  actionButton("create_order", ' добавить заказ', icon = icon('bitcoin')))),
+                  actionButton("create_order", ' добавить заказ', icon = icon('cart-arrow-down')))),
               fluidRow(box(title = 'Заказы', width = 12, status = "info", collapsible = TRUE,
                   DT::dataTableOutput("orders_table")))
       )
@@ -68,14 +69,27 @@ ui <- dashboardPage(skin = 'purple',
 
 server <- function(input, output) {
   
-  client_list <- updateSelector('clients', 'name')
+  client_list <- updateSelector('clients', 'name') 
+  order_list <- updateSelector('orders', 'none', all=TRUE)
   
-  output$customer_selector1 <- renderUI({
-    selectInput('customer1', label='имя клиента', choices = client_list)
+  output$customer_selector1 <- renderUI({ # need to change name according to table
+    selectInput('client_name', label='имя клиента', choices = client_list)
   })
   
-  output$customer_selector2 <- renderUI({
-    selectInput('customer2', label='имя клиента', choices = client_list)
+  output$customer_selector2 <- renderUI({ # need to change name according to table
+    selectInput('user_name', label='имя клиента', choices = client_list)
+  })
+  
+  output$item_selector <- renderUI({
+    selectizeInput('item', label='вещь', choices = c('', order_list$item), options = list(create = TRUE))
+  })
+  
+  output$material_selector <- renderUI({
+    selectizeInput('material', label='материал', choices = c('', order_list$material), options = list(create = TRUE))
+  })
+  
+  output$color_selector <- renderUI({
+    selectizeInput('color', label='цвет', choices = c('', order_list$color), options = list(create = TRUE))
   })
   
   output$client_table <- DT::renderDataTable(DT::datatable({
@@ -95,7 +109,13 @@ server <- function(input, output) {
   
   observeEvent(input$create_order, {
     insertRow(global_pool, 'orders', input)
-    #client_list <<- updateSelector('orders', 'items')
+    order_list <<- updateSelector('orders', 'none', all=TRUE)
+  })
+  
+  observeEvent(input$create_measurements, {
+    if (input$height != '' & input$chest_girth != ''){
+      insertRow(global_pool, 'measurements', input)
+    }
   })
   
 }
