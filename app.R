@@ -2,6 +2,7 @@ library(dplyr)
 library(shiny)
 library(shinydashboard)
 library(ggplot2)
+library(plotly)
 library(pool)
 
 
@@ -22,8 +23,7 @@ ui <- dashboardPage(skin = 'purple',
   dashboardSidebar(
     sidebarMenu(
                 convertMenuItem(menuItem("Статистика", tabName = "stat", icon = icon("calculator"),
-                         uiOutput("customer_stat"),
-                         uiOutput("item_stat"),
+                         uiOutput("group_field"),
                          dateRangeInput(inputId="period",
                                         label = "Period:",
                                         start = "2018-05-01",
@@ -42,6 +42,9 @@ ui <- dashboardPage(skin = 'purple',
     tabItems(
       
       tabItem(tabName = 'stat',
+              box(title = 'выручка', width = 12, status = "warning", collapsible = TRUE, solidHeader = TRUE,
+                  style = "background-color:  #fffae6;",
+                  plotlyOutput("revenue_plot")),
               fluidRow(box(title = 'Заказы', width = 12, status = "info", collapsible = TRUE,
                            DT::dataTableOutput("orders_table"))),
               fluidRow(box(title = 'Клиенты', width = 12, status = "info", collapsible = TRUE,
@@ -92,6 +95,8 @@ ui <- dashboardPage(skin = 'purple',
 
 server <- function(input, output, session) {
   
+  group_ptr <- list('клиент'='user_name', 'вещь'='item', 'дата'='created_at')
+  
   client_list <- updateSelector('clients', 'name') 
   order_list <- updateSelector('orders', 'none', all=TRUE)
   
@@ -115,25 +120,49 @@ server <- function(input, output, session) {
     selectizeInput('color', label='цвет', choices = c('', order_list$color), options = list(create = TRUE))
   })
   
-  output$customer_stat <- renderUI({
-    selectInput('customer', label='клиент', choices = client_list, selected = '')
+  output$group_field <- renderUI({
+    selectInput('grouper', label='поле группировки', choices = c('клиент', 'вещь', 'дата'), selected = 'клиент')
   })
-  
-  output$item_stat <- renderUI({
-    selectInput('itemz', label='вещь', choices = order_list$item, selected = '')
-  })
-  
-  
-  #
+
   output$client_table <- DT::renderDataTable(DT::datatable({
-    data <- global_pool %>% table('clients') %>% select(everything()) %>% collect()
+    data <- global_pool %>% tbl('clients') %>% select(everything()) %>% collect()
     data
-  }), options = list(scrollX = TRUE))
+  }, rownames = FALSE, filter = "top"), options = list(scrollX = TRUE))
   
   output$orders_table <- DT::renderDataTable(DT::datatable({
-    data <- mpg
+    data <- global_pool %>% tbl('orders') %>% select(everything()) %>% collect()
     data
-  }), options = list(scrollX = TRUE))
+  }, rownames = FALSE, filter = "top"), options = list(scrollX = TRUE))
+  
+  
+  output$revenue_plot <- renderPlotly({
+    
+    leftb <- as.character(input$period[1])
+    rightb <- as.character(input$period[2])
+    grp <- as.name(group_ptr[[input$grouper]])
+    
+    data <- global_pool %>% tbl('orders') %>% filter(created_at >= leftb & created_at <= rightb) %>% group_by(grp) %>% summarise(revenue = sum(price)) %>% collect()
+    
+    if (grp == 'created_at') {
+      
+      data$created_at <- as.Date(as.POSIXct(data$created_at, format="%Y-%m-%d", tz = "GMT"))
+      graph = plot_ly(data, x = data$created_at, y = data$revenue, mode = 'lines', type = "scatter") %>%
+        layout(yaxis = list(title = 'Выручка по дням', autosize = FALSE))
+      graph$elementId = NULL
+      
+    } else if (grp == 'item') {
+      
+      graph <- plot_ly(x = data$item, y = data$revenue, type = "bar")
+      
+    } else {
+      
+      graph <- plot_ly(x = data$user_name, y = data$revenue, type = "bar")
+      
+    }
+    
+    graph
+  })
+  
     
   observeEvent(input$create_client, {
       insertRow(global_pool, 'clients', input)
