@@ -8,6 +8,12 @@ library(pool)
 source("C:\\AtelierCRM\\module\\insertRow.R", local=TRUE)
 source("C:\\AtelierCRM\\module\\updateSelector.R", local=TRUE)
 
+convertMenuItem <- function(mi,tabName) {
+  mi$children[[1]]$attribs['data-toggle'] = "tab"
+  mi$children[[1]]$attribs['data-value'] = tabName
+  mi
+}
+
 global_pool <- dbPool(RSQLite::SQLite(), dbname = "C:\\sqlite\\sqlite-tools\\skiniyaCRM.db")
 
 
@@ -15,7 +21,18 @@ ui <- dashboardPage(skin = 'purple',
   dashboardHeader(title='Atelier CRM'),
   dashboardSidebar(
     sidebarMenu(
-                menuItem("Статистика", tabName = "clients", icon = icon("calculator")),
+                convertMenuItem(menuItem("Статистика", tabName = "stat", icon = icon("calculator"),
+                         uiOutput("customer_stat"),
+                         uiOutput("item_stat"),
+                         dateRangeInput(inputId="period",
+                                        label = "Period:",
+                                        start = "2018-05-01",
+                                        end = NULL,
+                                        min = "2018-05-01",
+                                        max = NULL,
+                                        separator = "")
+                         
+                ), "stat"),
                 menuItem("Клиенты", tabName = "clients", icon = icon("address-book")),
                 menuItem("Заказы", tabName = "orders", icon = icon("archive"))
     )
@@ -24,45 +41,50 @@ ui <- dashboardPage(skin = 'purple',
     
     tabItems(
       
+      tabItem(tabName = 'stat',
+              fluidRow(box(title = 'Заказы', width = 12, status = "info", collapsible = TRUE,
+                           DT::dataTableOutput("orders_table"))),
+              fluidRow(box(title = 'Клиенты', width = 12, status = "info", collapsible = TRUE,
+                           DT::dataTableOutput("client_table")))
+              ),
+      
       tabItem(tabName = 'clients',
-              fluidRow(box(title = "Новый клиент", width = 12, status = "primary", collapsible = TRUE,
+              fluidRow(box(title = "Новый клиент", width = 7, status = "primary", collapsible = TRUE, solidHeader = TRUE,
+                           style = "background-color:  #fffae6;",
                 column(width=4, textInput("name", "имя клиента:")),
                 column(width=4, textInput("address", "адрес клиента:")),
                 column(width=4, textInput("email", "email клиента:")),
-                actionButton("create_client", ' добавить клиента', icon = icon('address-book'))
+                actionButton("create_client", ' добавить клиента', icon = icon('address-book'),
+                             style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
               )), 
-              fluidRow(box(title='Мерки', width = 12, status = 'primary', collapsible=TRUE, collapsed = TRUE,
-                           fluidRow(
-                             column(width=4, uiOutput("customer_selector1")),
-                             column(width=2, textInput("height", "рост:")),
-                             column(width=2, textInput("chest_girth", "обхват груди:")),
-                             column(width=2, textInput("sleeve_length", "длина рукава:")),
-                             column(width=2, textInput("neck_girth", "обхват шеи:"))),
-                           fluidRow(column(width=2, textInput("waist", "талия:")),
-                             column(width=2, textInput("biceps_girth", "обхват бицепса:")),
-                             column(width=2, textInput("head_girth", "обхват головы:")),
-                             column(width=2, textInput("wrist_girth", "обхват запястья:")),
-                             column(width=2, textInput("shoulder", "плечо:")),
-                             column(width=2, textInput("notes", "заметки:")))
-                           )),
-              fluidRow(box(width = 4, status = 'primary', 
-                           actionButton("create_measurements", ' добавить мерки', icon = icon('user-edit')))),
-              fluidRow(box(title = 'Клиенты', width = 12, status = "info", 
-                  DT::dataTableOutput("client_table")))
+              fluidRow(box(title='Мерки', width = 7, status = 'primary', collapsible=TRUE, collapsed = TRUE, solidHeader = TRUE,
+                           style = "background-color:  #fffae6;",
+                           uiOutput("customer_selector1"),
+                           textInput("height", "рост:"),
+                           textInput("chest_girth", "обхват груди:"),
+                           textInput("sleeve_length", "длина рукава:"),
+                           textInput("neck_girth", "обхват шеи:"),
+                           textInput("waist", "талия:"),
+                           textInput("biceps_girth", "обхват бицепса:"),
+                           textInput("head_girth", "обхват головы:"),
+                           textInput("wrist_girth", "обхват запястья:"),
+                           textInput("shoulder", "плечо:"),
+                           textInput("notes", "заметки:"),
+                           actionButton("create_measurements", ' добавить мерки', icon = icon('user-edit'),
+                                        style="color: #fff; background-color: #337ab7; border-color: #2e6da4")))
       ),
       tabItem(tabName = 'orders',
-              fluidRow(box(title = 'Новый заказ',  width = 12, status = 'warning', collapsible = TRUE,
-                           column(width=4, uiOutput("customer_selector2")),
-                           column(width=2, uiOutput("item_selector")),
-                           column(width=2, uiOutput("material_selector")),
-                           column(width=2, uiOutput("color_selector")),
-                           column(width=2, textInput('price', label='цена'))
-                           )
-              ),
-              fluidRow(box(width = 4, status = 'warning', 
-                  actionButton("create_order", ' добавить заказ', icon = icon('cart-arrow-down')))),
-              fluidRow(box(title = 'Заказы', width = 12, status = "info", collapsible = TRUE,
-                  DT::dataTableOutput("orders_table")))
+              fluidRow(column(6, box(title = 'Новый заказ',  width = 7, status = 'warning', collapsible = TRUE, solidHeader = TRUE,
+                           style = "background-color:  #fffae6;",          
+                           uiOutput("customer_selector2"),
+                           uiOutput("item_selector"),
+                           uiOutput("material_selector"),
+                           uiOutput("color_selector"),
+                           textInput('price', label='цена'),
+                           br(),
+                           actionButton("create_order", ' добавить заказ', icon = icon('cart-arrow-down'),
+                                        style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+                           )))
       )
     )
   )
@@ -78,7 +100,7 @@ server <- function(input, output, session) {
   })
   
   output$customer_selector2 <- renderUI({
-    selectInput('user_name', label='имя клиента', choices = client_list)
+    selectInput('user_name', label='имя клиента', width='400px', choices = client_list)
   })
   
   output$item_selector <- renderUI({
@@ -93,8 +115,18 @@ server <- function(input, output, session) {
     selectizeInput('color', label='цвет', choices = c('', order_list$color), options = list(create = TRUE))
   })
   
+  output$customer_stat <- renderUI({
+    selectInput('customer', label='клиент', choices = client_list, selected = '')
+  })
+  
+  output$item_stat <- renderUI({
+    selectInput('itemz', label='вещь', choices = order_list$item, selected = '')
+  })
+  
+  
+  #
   output$client_table <- DT::renderDataTable(DT::datatable({
-    data <- mpg
+    data <- global_pool %>% table('clients') %>% select(everything()) %>% collect()
     data
   }), options = list(scrollX = TRUE))
   
