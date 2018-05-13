@@ -77,7 +77,7 @@ ui <- dashboardPage(skin = 'purple',
                                         style="color: #fff; background-color: #337ab7; border-color: #2e6da4")))
       ),
       tabItem(tabName = 'orders',
-              fluidRow(column(6, box(title = 'Новый заказ',  width = 7, status = 'warning', collapsible = TRUE, solidHeader = TRUE,
+             box(title = 'Новый заказ',  width = 5, status = 'warning', collapsible = TRUE, solidHeader = TRUE,
                            style = "background-color:  #fffae6;",          
                            uiOutput("customer_selector2"),
                            uiOutput("item_selector"),
@@ -87,7 +87,16 @@ ui <- dashboardPage(skin = 'purple',
                            br(),
                            actionButton("create_order", ' добавить заказ', icon = icon('cart-arrow-down'),
                                         style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
-                           )))
+                           ),
+             box(title = 'обновить заказ',  width = 5, status = 'warning', collapsible = TRUE, solidHeader = TRUE,
+                 style = "background-color:  #fffae6;",          
+                 uiOutput("order"),
+                 selectInput('status', label='выбрать статус', choices = c('готов', 'в производстве', 'отправлен'), selected = 'в производстве'),
+                 radioButtons(inputId = "delete", "удалить заказ?", c("да", "нет"), inline = TRUE, selected = "нет"),
+                 br(),
+                 actionButton("update_order", ' обновить заказ', icon = icon('cart-arrow-down'),
+                              style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+             )
       )
     )
   )
@@ -105,7 +114,7 @@ server <- function(input, output, session) {
   })
   
   output$customer_selector2 <- renderUI({
-    selectInput('user_name', label='имя клиента', width='400px', choices = client_list)
+    selectInput('user_name', label='имя клиента', choices = client_list)
   })
   
   output$item_selector <- renderUI({
@@ -122,6 +131,10 @@ server <- function(input, output, session) {
   
   output$group_field <- renderUI({
     selectInput('grouper', label='поле группировки', choices = c('клиент', 'вещь', 'дата'), selected = 'клиент')
+  })
+  
+  output$order <- renderUI({
+    selectInput('order_id', label='идентификатор заказа', choices = order_list$order_id)
   })
 
   output$client_table <- DT::renderDataTable(DT::datatable({
@@ -183,6 +196,15 @@ server <- function(input, output, session) {
   observeEvent(input$create_measurements, {
     if (input$height != '' & input$chest_girth != ''){
       insertRow(global_pool, 'measurements', input)
+    }
+  })
+  
+  observeEvent(input$update_order, {
+    
+    if (!input$delete){
+      updateRow(global_pool, 'orders', fields=c('status', 'order_id'))
+    } else {
+      updateRow(global_pool, 'orders', delete=TRUE)
     }
   })
   
