@@ -91,7 +91,7 @@ ui <- dashboardPage(skin = 'purple',
              box(title = 'обновить заказ',  width = 5, status = 'warning', collapsible = TRUE, solidHeader = TRUE,
                  style = "background-color:  #fffae6;",          
                  uiOutput("order"),
-                 selectInput('status', label='выбрать статус', choices = c('готов', 'в производстве', 'отправлен'), selected = 'в производстве'),
+                 selectInput('status', label='выбрать статус', choices = c('готов', 'ждет оплаты', 'в производстве', 'отправлен'), selected = 'ждет оплаты'),
                  radioButtons(inputId = "delete", "удалить заказ?", c("да", "нет"), inline = TRUE, selected = "нет"),
                  br(),
                  actionButton("update_order", ' обновить заказ', icon = icon('cart-arrow-down'),
@@ -134,7 +134,7 @@ server <- function(input, output, session) {
   })
   
   output$order <- renderUI({
-    selectInput('order_id', label='идентификатор заказа', choices = order_list$order_id)
+    selectInput('order_id_', label='идентификатор заказа', choices = order_list$order_id)
   })
 
   output$client_table <- DT::renderDataTable(DT::datatable({
