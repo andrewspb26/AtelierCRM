@@ -8,6 +8,7 @@ library(pool)
 
 source("C:\\AtelierCRM\\module\\insertRow.R", local=TRUE)
 source("C:\\AtelierCRM\\module\\updateSelector.R", local=TRUE)
+source("C:\\AtelierCRM\\module\\updateRow.R", local=TRUE)
 
 convertMenuItem <- function(mi,tabName) {
   mi$children[[1]]$attribs['data-toggle'] = "tab"
@@ -23,7 +24,10 @@ ui <- dashboardPage(skin = 'purple',
   dashboardSidebar(
     sidebarMenu(
                 convertMenuItem(menuItem("Статистика", tabName = "stat", icon = icon("calculator"),
-                         uiOutput("group_field"),
+
+                         selectInput('grouper', label='поле группировки', 
+                                     choices = c('клиент', 'вещь', 'дата'), 
+                                     selected = 'клиент'),
                          dateRangeInput(inputId="period",
                                         label = "Period:",
                                         start = "2018-05-01",
@@ -129,12 +133,8 @@ server <- function(input, output, session) {
     selectizeInput('color', label='цвет', choices = c('', order_list$color), options = list(create = TRUE))
   })
   
-  output$group_field <- renderUI({
-    selectInput('grouper', label='поле группировки', choices = c('клиент', 'вещь', 'дата'), selected = 'клиент')
-  })
-  
   output$order <- renderUI({
-    selectInput('order_id_', label='идентификатор заказа', choices = order_list$order_id)
+    selectInput('order_id', label='идентификатор заказа', choices = order_list$order_id)
   })
 
   output$client_table <- DT::renderDataTable(DT::datatable({
@@ -182,14 +182,24 @@ server <- function(input, output, session) {
       client_list <<- updateSelector('clients', 'name')
       updateTextInput(session, "name", value = '')     
       updateTextInput(session, "address", value = '')
-      updateTextInput(session, "email", value = '') 
+      updateTextInput(session, "email", value = '')
+      showModal(modalDialog(
+        title = "создан новый клиент",
+        easyClose = TRUE, footer = NULL
+      ))
   })
   
   observeEvent(input$create_order, {
     if (input$price != ''){
-      insertRow(global_pool, 'orders', input)
+      listed_input <- reactiveValuesToList(input)
+      listed_input <- listed_input[names(listed_input) != 'order_id']
+      insertRow(global_pool, 'orders', listed_input)
       order_list <<- updateSelector('orders', 'none', all=TRUE)
       updateTextInput(session, "price", value = '')
+      showModal(modalDialog(
+        title = "создан новый заказ",
+        easyClose = TRUE, footer = NULL
+      ))
       }
   })
   
@@ -201,8 +211,12 @@ server <- function(input, output, session) {
   
   observeEvent(input$update_order, {
     
-    if (!input$delete){
-      updateRow(global_pool, 'orders', fields=c('status', 'order_id'))
+    if (input$delete == 'нет'){
+      updateRow(input, global_pool, 'orders', c('status'), 'order_id')
+      showModal(modalDialog(
+        title = "статус заказа обновлен",
+        easyClose = TRUE, footer = NULL
+      ))
     } else {
       updateRow(global_pool, 'orders', delete=TRUE)
     }

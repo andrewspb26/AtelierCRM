@@ -30,13 +30,12 @@ create table orders (
 
   order_id integer PRIMARY KEY AUTOINCREMENT,
   user_name text,
-  started_at text,
-  finished_at text,
-  tracking_code text,
   item text,
   material text,
   color text,
   price integer,
-  created_at datetime default current_timestamp
+  status text,
+  notes text,
+  created_at datetime default current_date
   
 );
