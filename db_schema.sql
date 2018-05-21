@@ -33,6 +33,7 @@ create table orders (
   item text,
   material text,
   color text,
+  quantity integer,
   price integer,
   status text,
   notes text,

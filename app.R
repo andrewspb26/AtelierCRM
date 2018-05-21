@@ -77,6 +77,8 @@ ui <- dashboardPage(skin = 'purple',
                            textInput("wrist_girth", "обхват запястья:"),
                            textInput("shoulder", "плечо:"),
                            textInput("notes", "заметки:"),
+                           radioButtons(inputId = "update_measurements", "обновить мерки?", c("да", "нет"), inline = TRUE, selected = "нет"),
+                           br(),
                            actionButton("create_measurements", ' добавить мерки', icon = icon('user-edit'),
                                         style="color: #fff; background-color: #337ab7; border-color: #2e6da4")))
       ),
@@ -87,7 +89,9 @@ ui <- dashboardPage(skin = 'purple',
                            uiOutput("item_selector"),
                            uiOutput("material_selector"),
                            uiOutput("color_selector"),
+                           textInput('quantity', label='количество'),
                            textInput('price', label='цена'),
+                           textInput('notes', label='заметки'),
                            br(),
                            actionButton("create_order", ' добавить заказ', icon = icon('cart-arrow-down'),
                                         style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
@@ -113,6 +117,8 @@ server <- function(input, output, session) {
   client_list <- updateSelector('clients', 'name') 
   order_list <- updateSelector('orders', 'none', all=TRUE)
   
+  
+  # ui rendering
   output$customer_selector1 <- renderUI({
     selectInput('client_name', label='имя клиента', choices = client_list)
   })
@@ -153,14 +159,16 @@ server <- function(input, output, session) {
     leftb <- as.character(input$period[1])
     rightb <- as.character(input$period[2])
     grp <- as.name(group_ptr[[input$grouper]])
-    
-    data <- global_pool %>% tbl('orders') %>% filter(created_at >= leftb & created_at <= rightb) %>% group_by(grp) %>% summarise(revenue = sum(price)) %>% collect()
-    
+    print(leftb)
+    print(rightb)
+    data <- global_pool %>% tbl('orders') %>% filter(created_at >= leftb & created_at <= rightb & status != 'ждет оплаты') %>% 
+      group_by(grp) %>% summarise(revenue = sum(price*quantity)) %>% collect()
+
     if (grp == 'created_at') {
       
       data$created_at <- as.Date(as.POSIXct(data$created_at, format="%Y-%m-%d", tz = "GMT"))
       graph = plot_ly(data, x = data$created_at, y = data$revenue, mode = 'lines', type = "scatter") %>%
-        layout(yaxis = list(title = 'Выручка по дням', autosize = FALSE))
+                      layout(yaxis = list(title = 'Выручка по дням', autosize = FALSE))
       graph$elementId = NULL
       
     } else if (grp == 'item') {
@@ -176,7 +184,8 @@ server <- function(input, output, session) {
     graph
   })
   
-    
+  
+  # logic handling 
   observeEvent(input$create_client, {
       insertRow(global_pool, 'clients', input)
       client_list <<- updateSelector('clients', 'name')
@@ -196,6 +205,7 @@ server <- function(input, output, session) {
       insertRow(global_pool, 'orders', listed_input)
       order_list <<- updateSelector('orders', 'none', all=TRUE)
       updateTextInput(session, "price", value = '')
+      updateTextInput(session, "quantity", value = '')
       showModal(modalDialog(
         title = "создан новый заказ",
         easyClose = TRUE, footer = NULL
@@ -204,21 +214,58 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$create_measurements, {
-    if (input$height != '' & input$chest_girth != ''){
-      insertRow(global_pool, 'measurements', input)
+    
+    if(input$update_measurements != 'да') {
+      
+      if (input$height != '' & input$chest_girth != ''){
+        insertRow(global_pool, 'measurements', input)
+        
+        showModal(modalDialog(
+          title = "мерки добавлены",
+          easyClose = TRUE, footer = NULL
+        ))
+        
+      }
+      
+    } else {
+      
+      cols <- pool %>% tbl('measurements') %>% head %>% collect() %>%  lapply(type_sum) %>% unlist
+      notEmptyFields <- c()
+      
+      for (name in names(cols)) {
+        
+        if (input[[name]] != '') {
+          
+          notEmptyFields <- c(notEmptyFields, name)
+          
+        }
+      }
+      
+      updateRow(input, global_pool, 'measurements', id_field='client_name', to_update=notEmptyFields)
+      
+      showModal(modalDialog(
+        title = "мерки обновлены",
+        easyClose = TRUE, footer = NULL
+      ))
+      
     }
+    
   })
   
   observeEvent(input$update_order, {
     
     if (input$delete == 'нет'){
-      updateRow(input, global_pool, 'orders', c('status'), 'order_id')
+      updateRow(input, global_pool, 'orders', id_field='order_id', to_update=c('status'))
       showModal(modalDialog(
         title = "статус заказа обновлен",
         easyClose = TRUE, footer = NULL
       ))
     } else {
-      updateRow(global_pool, 'orders', delete=TRUE)
+      updateRow(input, global_pool, 'orders', id_field='order_id', delete=TRUE)
+      showModal(modalDialog(
+        title = "заказ удален",
+        easyClose = TRUE, footer = NULL
+      ))
     }
   })
   
