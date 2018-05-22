@@ -38,6 +38,7 @@ ui <- dashboardPage(skin = 'purple',
                          
                 ), "stat"),
                 menuItem("Клиенты", tabName = "clients", icon = icon("address-book")),
+                menuItem("Мерки", tabName = "measurements", icon=icon("arrows-alt")),
                 menuItem("Заказы", tabName = "orders", icon = icon("archive"))
     )
   ),
@@ -77,13 +78,19 @@ ui <- dashboardPage(skin = 'purple',
                            textInput("wrist_girth", "обхват запястья:"),
                            textInput("shoulder", "плечо:"),
                            textInput("notes", "заметки:"),
-                           radioButtons(inputId = "update_measurements", "обновить мерки?", c("да", "нет"), inline = TRUE, selected = "нет"),
+                           radioButtons(inputId = "update_measurements", "обновить мерки?", 
+                                        c("да", "нет"), inline = TRUE, selected = "нет"),
                            br(),
                            actionButton("create_measurements", ' добавить мерки', icon = icon('user-edit'),
                                         style="color: #fff; background-color: #337ab7; border-color: #2e6da4")))
       ),
+      
+      tabItem(tabName = 'measurements',
+              fluidRow(box(title='мерки клиентов', width = 12, status= 'primary',style = "background-color:  #fffae6;",
+                           DT::dataTableOutput("measurements_table")))),
+      
       tabItem(tabName = 'orders',
-             box(title = 'Новый заказ',  width = 5, status = 'warning', collapsible = TRUE, solidHeader = TRUE,
+             box(title = 'Новый заказ', width = 5, status = 'warning', collapsible = TRUE, solidHeader = TRUE,
                            style = "background-color:  #fffae6;",          
                            uiOutput("customer_selector2"),
                            uiOutput("item_selector"),
@@ -99,8 +106,11 @@ ui <- dashboardPage(skin = 'purple',
              box(title = 'обновить заказ',  width = 5, status = 'warning', collapsible = TRUE, solidHeader = TRUE,
                  style = "background-color:  #fffae6;",          
                  uiOutput("order"),
-                 selectInput('status', label='выбрать статус', choices = c('готов', 'ждет оплаты', 'в производстве', 'отправлен'), selected = 'ждет оплаты'),
-                 radioButtons(inputId = "delete", "удалить заказ?", c("да", "нет"), inline = TRUE, selected = "нет"),
+                 selectInput('status', label='выбрать статус', 
+                             choices = c('готов', 'ждет оплаты', 'в производстве', 'отправлен'), 
+                             selected = 'ждет оплаты'),
+                 radioButtons(inputId = "delete", "удалить заказ?", 
+                              c("да", "нет"), inline = TRUE, selected = "нет"),
                  br(),
                  actionButton("update_order", ' обновить заказ', icon = icon('cart-arrow-down'),
                               style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
@@ -112,13 +122,13 @@ ui <- dashboardPage(skin = 'purple',
 
 server <- function(input, output, session) {
   
+  # GLOBAL VARS
   group_ptr <- list('клиент'='user_name', 'вещь'='item', 'дата'='created_at')
-  
   client_list <- updateSelector('clients', 'name') 
   order_list <- updateSelector('orders', 'none', all=TRUE)
   
   
-  # ui rendering
+  # UI RENDERING
   output$customer_selector1 <- renderUI({
     selectInput('client_name', label='имя клиента', choices = client_list)
   })
@@ -153,14 +163,17 @@ server <- function(input, output, session) {
     data
   }, rownames = FALSE, filter = "top"), options = list(scrollX = TRUE))
   
+  output$measurements_table <- DT::renderDataTable(DT::datatable({
+    data <- global_pool %>% tbl('measurements') %>% select(everything()) %>% collect()
+    data
+  }, rownames = FALSE, filter = "top"), options = list(scrollX = TRUE))
+  
   
   output$revenue_plot <- renderPlotly({
     
     leftb <- as.character(input$period[1])
     rightb <- as.character(input$period[2])
     grp <- as.name(group_ptr[[input$grouper]])
-    print(leftb)
-    print(rightb)
     data <- global_pool %>% tbl('orders') %>% filter(created_at >= leftb & created_at <= rightb & status != 'ждет оплаты') %>% 
       group_by(grp) %>% summarise(revenue = sum(price*quantity)) %>% collect()
 
@@ -171,13 +184,9 @@ server <- function(input, output, session) {
                       layout(yaxis = list(title = 'Выручка по дням', autosize = FALSE))
       graph$elementId = NULL
       
-    } else if (grp == 'item') {
-      
-      graph <- plot_ly(x = data$item, y = data$revenue, type = "bar")
-      
     } else {
       
-      graph <- plot_ly(x = data$user_name, y = data$revenue, type = "bar")
+      graph <- plot_ly(x = data[[grp]], y = data$revenue, type = "bar")
       
     }
     
@@ -185,7 +194,7 @@ server <- function(input, output, session) {
   })
   
   
-  # logic handling 
+  # LOGIC HANDLING 
   observeEvent(input$create_client, {
       insertRow(global_pool, 'clients', input)
       client_list <<- updateSelector('clients', 'name')
@@ -199,6 +208,7 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$create_order, {
+    
     if (input$price != ''){
       listed_input <- reactiveValuesToList(input)
       listed_input <- listed_input[names(listed_input) != 'order_id']
@@ -219,37 +229,26 @@ server <- function(input, output, session) {
       
       if (input$height != '' & input$chest_girth != ''){
         insertRow(global_pool, 'measurements', input)
-        
         showModal(modalDialog(
           title = "мерки добавлены",
           easyClose = TRUE, footer = NULL
         ))
-        
       }
-      
     } else {
-      
       cols <- pool %>% tbl('measurements') %>% head %>% collect() %>%  lapply(type_sum) %>% unlist
       notEmptyFields <- c()
       
       for (name in names(cols)) {
-        
         if (input[[name]] != '') {
-          
           notEmptyFields <- c(notEmptyFields, name)
-          
         }
       }
-      
       updateRow(input, global_pool, 'measurements', id_field='client_name', to_update=notEmptyFields)
-      
       showModal(modalDialog(
         title = "мерки обновлены",
         easyClose = TRUE, footer = NULL
       ))
-      
     }
-    
   })
   
   observeEvent(input$update_order, {
