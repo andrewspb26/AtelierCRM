@@ -154,14 +154,21 @@ server <- function(input, output, session) {
   })
 
   output$client_table <- DT::renderDataTable(DT::datatable({
-    data <- global_pool %>% tbl('clients') %>% select(everything()) %>% collect()
+    leftb <- as.character(input$period[1])
+    rightb <- as.character(input$period[2])
+    data <- global_pool %>% tbl('clients') %>% filter(created_at >= leftb & created_at <= rightb) %>%
+      select(everything()) %>% arrange(desc(created_at)) %>% collect() 
     data
   }, rownames = FALSE, filter = "top"), options = list(scrollX = TRUE))
   
   output$orders_table <- DT::renderDataTable(DT::datatable({
-    data <- global_pool %>% tbl('orders') %>% select(everything()) %>% collect()
+    leftb <- as.character(input$period[1])
+    rightb <- as.character(input$period[2])
+    data <- global_pool %>% tbl('orders') %>% filter(created_at >= leftb & created_at <= rightb) %>% 
+      select(everything()) %>% arrange(desc(created_at)) %>% collect()
     data
   }, rownames = FALSE, filter = "top"), options = list(scrollX = TRUE))
+  
   
   output$measurements_table <- DT::renderDataTable(DT::datatable({
     data <- global_pool %>% tbl('measurements') %>% select(everything()) %>% collect()
