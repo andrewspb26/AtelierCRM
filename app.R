@@ -9,6 +9,7 @@ library(pool)
 source("C:\\AtelierCRM\\module\\insertRow.R", local=TRUE)
 source("C:\\AtelierCRM\\module\\updateSelector.R", local=TRUE)
 source("C:\\AtelierCRM\\module\\updateRow.R", local=TRUE)
+source("C:\\AtelierCRM\\module\\validateUpdatingFields.R", local=TRUE)
 
 convertMenuItem <- function(mi,tabName) {
   mi$children[[1]]$attribs['data-toggle'] = "tab"
@@ -59,11 +60,14 @@ ui <- dashboardPage(skin = 'purple',
       tabItem(tabName = 'clients',
               fluidRow(box(title = "Новый клиент", width = 7, status = "primary", collapsible = TRUE, solidHeader = TRUE,
                            style = "background-color:  #fffae6;",
-                column(width=4, textInput("name", "имя клиента:")),
-                column(width=4, textInput("address", "адрес клиента:")),
-                column(width=4, textInput("email", "email клиента:")),
-                actionButton("create_client", ' добавить клиента', icon = icon('address-book'),
-                             style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+                           textInput("name", "имя клиента:"),
+                           textInput("address", "адрес клиента:"),
+                           textInput("email", "email клиента:"),
+                           radioButtons(inputId = "update_client", "обновить клиента?", 
+                                        c("да", "нет"), inline = TRUE, selected = "нет"),
+                           br(),
+                           actionButton("create_client", 'добавить клиента', icon = icon('address-book'),
+                                        style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
               )), 
               fluidRow(box(title='Мерки', width = 7, status = 'primary', collapsible=TRUE, collapsed = TRUE, solidHeader = TRUE,
                            style = "background-color:  #fffae6;",
@@ -203,6 +207,8 @@ server <- function(input, output, session) {
   
   # LOGIC HANDLING 
   observeEvent(input$create_client, {
+    if(input$update_client != 'да') {
+      
       insertRow(global_pool, 'clients', input)
       client_list <<- updateSelector('clients', 'name')
       updateTextInput(session, "name", value = '')     
@@ -212,6 +218,25 @@ server <- function(input, output, session) {
         title = "создан новый клиент",
         easyClose = TRUE, footer = NULL
       ))
+      
+    } else if (input$name != '') {
+      
+      notEmptyFields <- validateUpdatingFields(global_pool, 'clients', input)
+      updateRow(input, global_pool, 'clients', id_field='name', to_update=notEmptyFields)
+      showModal(modalDialog(
+        title = "данные клиента обновлены",
+        easyClose = TRUE, footer = NULL
+      ))
+      
+    } else {
+      
+      showModal(modalDialog(
+        title = "необходимо ввести имя клиента",
+        easyClose = TRUE, footer = NULL
+      ))
+      
+    }
+      
   })
   
   observeEvent(input$create_order, {
@@ -242,14 +267,7 @@ server <- function(input, output, session) {
         ))
       }
     } else {
-      cols <- pool %>% tbl('measurements') %>% head %>% collect() %>%  lapply(type_sum) %>% unlist
-      notEmptyFields <- c()
-      
-      for (name in names(cols)) {
-        if (input[[name]] != '') {
-          notEmptyFields <- c(notEmptyFields, name)
-        }
-      }
+      notEmptyFields <- validateUpdatingFields(global_pool, 'measurements', input)
       updateRow(input, global_pool, 'measurements', id_field='client_name', to_update=notEmptyFields)
       showModal(modalDialog(
         title = "мерки обновлены",
