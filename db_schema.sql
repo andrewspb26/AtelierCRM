@@ -22,7 +22,7 @@ create table measurements (
   head_girth integer,
   wrist_girth integer,
   shoulder integer,
-  notes text
+  info text
   
 );
 

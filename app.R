@@ -81,7 +81,7 @@ ui <- dashboardPage(skin = 'purple',
                            textInput("head_girth", "обхват головы:"),
                            textInput("wrist_girth", "обхват запястья:"),
                            textInput("shoulder", "плечо:"),
-                           textInput("notes", "заметки:"),
+                           textInput("info", "заметки:"),
                            radioButtons(inputId = "update_measurements", "обновить мерки?", 
                                         c("да", "нет"), inline = TRUE, selected = "нет"),
                            br(),
@@ -240,7 +240,7 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$create_order, {
-    
+    print(input$notes)
     if (input$price != ''){
       listed_input <- reactiveValuesToList(input)
       listed_input <- listed_input[names(listed_input) != 'order_id']
