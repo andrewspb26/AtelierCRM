@@ -48,7 +48,10 @@ ui <- dashboardPage(skin = 'purple',
     tabItems(
       
       tabItem(tabName = 'stat',
-              box(title = 'выручка', width = 12, status = "warning", collapsible = TRUE, solidHeader = TRUE,
+              fluidRow(infoBoxOutput("orderBox"),
+                       infoBoxOutput("revenueBox"),
+                       infoBoxOutput("clientBox")),
+              box(title = 'выручка', width = 12, status = "warning", collapsible = TRUE, solidHeader = FALSE,
                   style = "background-color:  #fffae6;",
                   plotlyOutput("revenue_plot")),
               fluidRow(box(title = 'Заказы', width = 12, status = "info", collapsible = TRUE,
@@ -124,12 +127,16 @@ ui <- dashboardPage(skin = 'purple',
   )
 )
 
+
 server <- function(input, output, session) {
   
   # GLOBAL VARS
   group_ptr <- list('клиент'='user_name', 'вещь'='item', 'дата'='created_at')
   client_list <- updateSelector('clients', 'name') 
   order_list <- updateSelector('orders', 'none', all=TRUE)
+  n_orders <- 0
+  revenue <- 0
+  n_clients <- 0
   
   
   # UI RENDERING
@@ -161,7 +168,8 @@ server <- function(input, output, session) {
     leftb <- as.character(input$period[1])
     rightb <- as.character(input$period[2])
     data <- global_pool %>% tbl('clients') %>% filter(created_at >= leftb & created_at <= rightb) %>%
-      select(everything()) %>% arrange(desc(created_at)) %>% collect() 
+      select(everything()) %>% arrange(desc(created_at)) %>% collect()
+    n_clients <<- nrow(data)
     data
   }, rownames = FALSE, filter = "top"), options = list(scrollX = TRUE))
   
@@ -170,6 +178,9 @@ server <- function(input, output, session) {
     rightb <- as.character(input$period[2])
     data <- global_pool %>% tbl('orders') %>% filter(created_at >= leftb & created_at <= rightb) %>% 
       select(everything()) %>% arrange(desc(created_at)) %>% collect()
+    n_orders <<- nrow(data)
+    revenue <- data %>% filter(status != 'ждет оплаты') %>% summarise(rev = sum(price*quantity)) %>% collect()
+    revenue <<- revenue$rev
     data
   }, rownames = FALSE, filter = "top"), options = list(scrollX = TRUE))
   
@@ -191,7 +202,7 @@ server <- function(input, output, session) {
     if (grp == 'created_at') {
       
       data$created_at <- as.Date(as.POSIXct(data$created_at, format="%Y-%m-%d", tz = "GMT"))
-      graph = plot_ly(data, x = data$created_at, y = data$revenue, mode = 'lines', type = "scatter") %>%
+      graph = plot_ly(data, x = data$created_at, y = data$revenue, type = "bar") %>%
                       layout(yaxis = list(title = 'Выручка по дням', autosize = FALSE))
       graph$elementId = NULL
       
@@ -202,6 +213,27 @@ server <- function(input, output, session) {
     }
     
     graph
+  })
+  
+  output$orderBox <- renderInfoBox({
+    infoBox(
+      "количество заказов", n_orders, icon = icon("list"),
+      color = "blue"
+    )
+  })
+  
+  output$revenueBox <- renderInfoBox({
+    infoBox(
+      "выручка, $", revenue, icon = icon("credit-card"),
+      color = "purple"
+    )
+  })
+  
+  output$clientBox <- renderInfoBox({
+    infoBox(
+      "клиентов", n_clients, icon = icon("address-book"),
+      color = "blue"
+    )
   })
   
   
