@@ -51,8 +51,7 @@ ui <- dashboardPage(skin = 'purple',
               fluidRow(infoBoxOutput("orderBox"),
                        infoBoxOutput("revenueBox"),
                        infoBoxOutput("clientBox")),
-              box(title = 'выручка', width = 12, status = "warning", collapsible = TRUE, solidHeader = FALSE,
-                  style = "background-color:  #fffae6;",
+              box(title = 'выручка', width = 13, status = "warning", collapsible = TRUE, solidHeader = FALSE,
                   plotlyOutput("revenue_plot")),
               fluidRow(box(title = 'Заказы', width = 12, status = "info", collapsible = TRUE,
                            DT::dataTableOutput("orders_table"))),
@@ -134,9 +133,7 @@ server <- function(input, output, session) {
   group_ptr <- list('клиент'='user_name', 'вещь'='item', 'дата'='created_at')
   client_list <- updateSelector('clients', 'name') 
   order_list <- updateSelector('orders', 'none', all=TRUE)
-  n_orders <- 0
-  revenue <- 0
-  n_clients <- 0
+  rvalues <- reactiveValues(revenue=0, n_orders=0, n_clients=0)
   
   
   # UI RENDERING
@@ -169,26 +166,26 @@ server <- function(input, output, session) {
     rightb <- as.character(input$period[2])
     data <- global_pool %>% tbl('clients') %>% filter(created_at >= leftb & created_at <= rightb) %>%
       select(everything()) %>% arrange(desc(created_at)) %>% collect()
-    n_clients <<- nrow(data)
+    rvalues$n_clients <- nrow(data)
     data
-  }, rownames = FALSE, filter = "top"), options = list(scrollX = TRUE))
+  }, rownames = FALSE, filter = "top"), options = list(scrollX = TRUE, scrollY=TRUE))
   
   output$orders_table <- DT::renderDataTable(DT::datatable({
     leftb <- as.character(input$period[1])
     rightb <- as.character(input$period[2])
     data <- global_pool %>% tbl('orders') %>% filter(created_at >= leftb & created_at <= rightb) %>% 
       select(everything()) %>% arrange(desc(created_at)) %>% collect()
-    n_orders <<- nrow(data)
+    rvalues$n_orders <- nrow(data)
     revenue <- data %>% filter(status != 'ждет оплаты') %>% summarise(rev = sum(price*quantity)) %>% collect()
-    revenue <<- revenue$rev
+    rvalues$revenue <- revenue$rev
     data
-  }, rownames = FALSE, filter = "top"), options = list(scrollX = TRUE))
+  }, rownames = FALSE, filter = "top"), options = list(scrollX = TRUE, scrollY = TRUE))
   
   
   output$measurements_table <- DT::renderDataTable(DT::datatable({
     data <- global_pool %>% tbl('measurements') %>% select(everything()) %>% collect()
     data
-  }, rownames = FALSE, filter = "top"), options = list(scrollX = TRUE))
+  }, rownames = FALSE, filter = "top"), options = list(scrollX = TRUE, scrollY = TRUE))
   
   
   output$revenue_plot <- renderPlotly({
@@ -217,21 +214,21 @@ server <- function(input, output, session) {
   
   output$orderBox <- renderInfoBox({
     infoBox(
-      "количество заказов", n_orders, icon = icon("list"),
+      "количество заказов", rvalues$n_orders, icon = icon("list"),
       color = "blue"
     )
   })
   
   output$revenueBox <- renderInfoBox({
     infoBox(
-      "выручка, $", revenue, icon = icon("credit-card"),
+      "выручка, $", rvalues$revenue, icon = icon("credit-card"),
       color = "purple"
     )
   })
   
   output$clientBox <- renderInfoBox({
     infoBox(
-      "клиентов", n_clients, icon = icon("address-book"),
+      "клиентов", rvalues$n_clients, icon = icon("address-book"),
       color = "blue"
     )
   })
