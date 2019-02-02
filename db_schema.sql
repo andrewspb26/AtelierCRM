@@ -40,3 +40,14 @@ create table orders (
   created_at datetime default current_date
   
 );
+
+
+create table reminder (
+  
+  reminder_id integer PRIMARY KEY AUTOINCREMENT,
+  author text,
+  message text,
+  started_at datetime,
+  finished_at datetime
+  
+);

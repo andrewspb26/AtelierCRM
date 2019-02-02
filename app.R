@@ -21,7 +21,8 @@ global_pool <- dbPool(RSQLite::SQLite(), dbname = "C:\\sqlite\\sqlite-tools\\ski
 
 
 ui <- dashboardPage(skin = 'purple',
-  dashboardHeader(title='Atelier CRM'),
+  dashboardHeader(title='Atelier CRM',
+                  dropdownMenuOutput("reminder")),
   dashboardSidebar(
     sidebarMenu(
                 convertMenuItem(menuItem("Статистика", tabName = "stat", icon = icon("calculator"),
@@ -40,7 +41,8 @@ ui <- dashboardPage(skin = 'purple',
                 ), "stat"),
                 menuItem("Клиенты", tabName = "clients", icon = icon("address-book")),
                 menuItem("Мерки", tabName = "measurements", icon=icon("arrows-alt")),
-                menuItem("Заказы", tabName = "orders", icon = icon("archive"))
+                menuItem("Заказы", tabName = "orders", icon = icon("archive")),
+                menuItem("Напоминалки", badgeLabel = "new", tabName = "reminder", icon = icon("paper-plane"))
     )
   ),
   dashboardBody(
@@ -121,7 +123,17 @@ ui <- dashboardPage(skin = 'purple',
                  actionButton("update_order", ' обновить заказ', icon = icon('cart-arrow-down'),
                               style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
              )
-      )
+      ),
+      
+      tabItem(tabName = 'reminder', 
+              box(title = 'Создать напоминание', width = 5, status = 'primary', solidHeader = FALSE,
+                  dateInput("started_at", label = "начать показ", value = Sys.Date()),
+                  dateInput("finished_at", label = "закончить показ", value = Sys.Date()+14),
+                  textInput('author', label='автор'),
+                  textInput('message', label='сообщение'),
+                  actionButton("create_reminder", 'создать напоминание', icon = icon('"paper-plane"'),
+                               style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+                  ))
     )
   )
 )
@@ -231,6 +243,19 @@ server <- function(input, output, session) {
       "клиентов", rvalues$n_clients, icon = icon("address-book"),
       color = "blue"
     )
+  })
+  
+  output$reminder <- renderMenu({
+    
+    today <- Sys.Date()
+    messageData <- global_pool %>% tbl("reminder") %>% 
+      filter(finished_at >= today & started_at <= today) %>% 
+       arrange(desc(finished_at)) %>% select(author, message) %>% collect()
+    msgs <- apply(messageData, 1, function(row) {
+      messageItem(from = row[["author"]], message = row[["message"]])
+    })
+    
+    dropdownMenu(type = "messages", .list = msgs, badgeStatus = "warning")
   })
   
   
