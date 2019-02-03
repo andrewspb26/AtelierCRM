@@ -17,7 +17,7 @@ convertMenuItem <- function(mi,tabName) {
   mi
 }
 
-global_pool <- dbPool(RSQLite::SQLite(), dbname = "C:\\sqlite\\sqlite-tools\\skiniyaCRM.db")
+global_pool <- dbPool(RSQLite::SQLite(), dbname = "C:\\AtelierCRM\\backup\\skiniyaCRM.db")
 
 
 ui <- dashboardPage(skin = 'purple',
@@ -128,9 +128,11 @@ ui <- dashboardPage(skin = 'purple',
       tabItem(tabName = 'reminder', 
               box(title = 'Создать напоминание', width = 5, status = 'primary', solidHeader = FALSE,
                   dateInput("started_at", label = "начать показ", value = Sys.Date()),
-                  dateInput("finished_at", label = "закончить показ", value = Sys.Date()+14),
+                  dateInput("finished_at", label = "закончить показ", value = Sys.Date()+2),
                   textInput('author', label='автор'),
                   textInput('message', label='сообщение'),
+                  radioButtons(inputId = "delete_reminder", "удалить напоминание?", 
+                               c("да", "нет"), inline = TRUE, selected = "нет"),
                   actionButton("create_reminder", 'создать напоминание', icon = icon('"paper-plane"'),
                                style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
                   ))
@@ -251,11 +253,13 @@ server <- function(input, output, session) {
     messageData <- global_pool %>% tbl("reminder") %>% 
       filter(finished_at >= today & started_at <= today) %>% 
        arrange(desc(finished_at)) %>% select(author, message) %>% collect()
-    msgs <- apply(messageData, 1, function(row) {
-      messageItem(from = row[["author"]], message = row[["message"]])
-    })
-    
-    dropdownMenu(type = "messages", .list = msgs, badgeStatus = "warning")
+    print(messageData)
+    if (nrow(messageData) > 0) {
+      msgs <- apply(messageData, 1, function(row) {
+        messageItem(from = row[["author"]], message = row[["message"]])
+      })
+      dropdownMenu(type = "messages", .list = msgs, badgeStatus = "warning")
+    }
   })
   
   
@@ -342,6 +346,36 @@ server <- function(input, output, session) {
       updateRow(input, global_pool, 'orders', id_field='order_id', delete=TRUE)
       showModal(modalDialog(
         title = "заказ удален",
+        easyClose = TRUE, footer = NULL
+      ))
+    }
+  })
+  
+  observeEvent(input$create_reminder, {
+    if (input$author != '' & input$message != '') {
+      if (input$delete_reminder == 'нет') {
+        input_ <- list()
+        input_$author <- input$author
+        input_$message <- input$message
+        input_$started_at <- as.character(input$started_at)
+        input_$finished_at <- as.character(input$finished_at)
+        insertRow(global_pool, 'reminder', input_)
+        showModal(modalDialog(
+          title = "напоминание создано",
+          easyClose = TRUE, footer = NULL
+        ))
+      } else {
+        updateRow(input, global_pool, 'reminder', id_field='message', delete=TRUE)
+        showModal(modalDialog(
+          title = "напоминание удалено",
+          easyClose = TRUE, footer = NULL
+        ))
+      }
+      updateTextInput(session, "author", value = '')
+      updateTextInput(session, "message", value = '')
+    } else {
+      showModal(modalDialog(
+        title = "не все поля заполены",
         easyClose = TRUE, footer = NULL
       ))
     }
