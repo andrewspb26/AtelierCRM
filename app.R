@@ -182,7 +182,7 @@ server <- function(input, output, session) {
       select(everything()) %>% arrange(desc(created_at)) %>% collect()
     rvalues$n_clients <- nrow(data)
     data
-  }, rownames = FALSE, filter = "top"), options = list(scrollX = TRUE, scrollY=TRUE))
+  }, rownames = FALSE, filter = "top", options = list(scroller = TRUE, scrollX = TRUE)))
   
   output$orders_table <- DT::renderDataTable(DT::datatable({
     leftb <- as.character(input$period[1])
@@ -193,13 +193,13 @@ server <- function(input, output, session) {
     revenue <- data %>% filter(status != 'ждет оплаты') %>% summarise(rev = sum(price*quantity)) %>% collect()
     rvalues$revenue <- revenue$rev
     data
-  }, rownames = FALSE, filter = "top"), options = list(scrollX = TRUE, scrollY = TRUE))
+  }, rownames = FALSE, filter = "top", options = list(scroller = TRUE, scrollX = TRUE)))
   
   
   output$measurements_table <- DT::renderDataTable(DT::datatable({
     data <- global_pool %>% tbl('measurements') %>% select(everything()) %>% collect()
     data
-  }, rownames = FALSE, filter = "top"), options = list(scrollX = TRUE, scrollY = TRUE))
+  }, rownames = FALSE, filter = "top", options = list(scroller = TRUE, scrollX = TRUE)))
   
   
   output$revenue_plot <- renderPlotly({
