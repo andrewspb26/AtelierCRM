@@ -37,7 +37,9 @@ create table orders (
   price integer,
   status text,
   notes text,
-  created_at datetime default current_date
+  created_at datetime default current_date,
+  postal_code text,
+  order_hash text
   
 );
 

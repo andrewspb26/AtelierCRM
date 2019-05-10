@@ -98,8 +98,7 @@ ui <- dashboardPage(skin = 'purple',
                            DT::dataTableOutput("measurements_table")))),
       
       tabItem(tabName = 'orders',
-             box(title = 'Новый заказ', width = 5, status = 'warning', collapsible = TRUE, solidHeader = TRUE,
-                           style = "background-color:  #fffae6;",          
+             box(title = 'Новый заказ', width = 5, status = 'warning', collapsible = TRUE, solidHeader = FALSE,
                            uiOutput("customer_selector2"),
                            uiOutput("item_selector"),
                            uiOutput("material_selector"),
@@ -111,12 +110,12 @@ ui <- dashboardPage(skin = 'purple',
                            actionButton("create_order", ' добавить заказ', icon = icon('cart-arrow-down'),
                                         style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
                            ),
-             box(title = 'обновить заказ',  width = 5, status = 'warning', collapsible = TRUE, solidHeader = TRUE,
-                 style = "background-color:  #fffae6;",          
+             box(title = 'обновить заказ',  width = 5, status = 'warning', collapsible = TRUE, solidHeader = FALSE,
                  uiOutput("order"),
                  selectInput('status', label='выбрать статус', 
                              choices = c('готов', 'ждет оплаты', 'в производстве', 'отправлен'), 
                              selected = 'ждет оплаты'),
+                 uiOutput("postal"),
                  radioButtons(inputId = "delete", "удалить заказ?", 
                               c("да", "нет"), inline = TRUE, selected = "нет"),
                  br(),
@@ -174,6 +173,11 @@ server <- function(input, output, session) {
   output$order <- renderUI({
     selectInput('order_id', label='идентификатор заказа', choices = order_list$order_id)
   })
+  
+  output$postal <- renderUI({
+    if (input$status == "отправлен") 
+      textInput("postal_code", "почтовый код")
+  })
 
   output$client_table <- DT::renderDataTable(DT::datatable({
     leftb <- as.character(input$period[1])
@@ -188,7 +192,7 @@ server <- function(input, output, session) {
     leftb <- as.character(input$period[1])
     rightb <- as.character(input$period[2])
     data <- global_pool %>% tbl('orders') %>% filter(created_at >= leftb & created_at <= rightb) %>% 
-      select(everything()) %>% arrange(desc(created_at)) %>% collect()
+      select(everything(), -one_of(c('order_hash'))) %>% arrange(desc(created_at)) %>% collect()
     rvalues$n_orders <- nrow(data)
     revenue <- data %>% filter(status != 'ждет оплаты') %>% summarise(rev = sum(price*quantity)) %>% collect()
     rvalues$revenue <- revenue$rev
@@ -298,10 +302,11 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$create_order, {
-    print(input$notes)
     if (input$price != ''){
+      to_hash <- paste0(input$user_name, Sys.Date())
       listed_input <- reactiveValuesToList(input)
       listed_input <- listed_input[names(listed_input) != 'order_id']
+      listed_input$order_hash <- digest(to_hash, algo="md5", serialize=F)
       insertRow(global_pool, 'orders', listed_input)
       order_list <<- updateSelector('orders', 'none', all=TRUE)
       updateTextInput(session, "price", value = '')
@@ -337,11 +342,38 @@ server <- function(input, output, session) {
   observeEvent(input$update_order, {
     
     if (input$delete == 'нет'){
-      updateRow(input, global_pool, 'orders', id_field='order_id', to_update=c('status'))
-      showModal(modalDialog(
-        title = "статус заказа обновлен",
-        easyClose = TRUE, footer = NULL
-      ))
+      order_hash <- global_pool %>% tbl('orders') %>% 
+        filter(order_id == input$order_id) %>% select('order_hash') %>% collect()
+      listed_input <- reactiveValuesToList(input)
+      listed_input$order_hash <- order_hash$order_hash
+      
+      
+      if (input$status == 'отправлен') {
+        if (input$postal_code != '') {
+          updateRow(listed_input, global_pool, 'orders', id_field='order_hash', to_update=c('status', 'postal_code'))
+          
+          showModal(modalDialog(
+            title = "статус заказа обновлен",
+            easyClose = TRUE, footer = NULL
+          ))
+          
+        } else {
+          
+          showModal(modalDialog(
+            title = "необходим почтовый код",
+            easyClose = TRUE, footer = NULL
+          ))
+          
+        }
+      } else {
+        updateRow(listed_input, global_pool, 'orders', id_field='order_hash', to_update=c('status'))
+        
+        showModal(modalDialog(
+          title = "статус заказа обновлен",
+          easyClose = TRUE, footer = NULL
+        ))
+      }
+  
     } else {
       updateRow(input, global_pool, 'orders', id_field='order_id', delete=TRUE)
       showModal(modalDialog(
