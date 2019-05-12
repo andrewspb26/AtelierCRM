@@ -1,7 +1,7 @@
+library(digest)
 library(dplyr)
 library(shiny)
 library(shinydashboard)
-library(ggplot2)
 library(plotly)
 library(pool)
 
@@ -21,122 +21,120 @@ global_pool <- dbPool(RSQLite::SQLite(), dbname = "C:\\AtelierCRM\\backup\\skini
 
 
 ui <- dashboardPage(skin = 'purple',
-  dashboardHeader(title='Atelier CRM',
-                  dropdownMenuOutput("reminder")),
-  dashboardSidebar(
-    sidebarMenu(
-                convertMenuItem(menuItem("Статистика", tabName = "stat", icon = icon("calculator"),
-
-                         selectInput('grouper', label='поле группировки', 
-                                     choices = c('клиент', 'вещь', 'дата'), 
-                                     selected = 'клиент'),
-                         dateRangeInput(inputId="period",
-                                        label = "Period:",
-                                        start = Sys.Date() - 28,
-                                        end = Sys.Date() + 1,
-                                        min = "2018-05-01",
-                                        max = NULL,
-                                        separator = "")
-                         
-                ), "stat"),
-                menuItem("Клиенты", tabName = "clients", icon = icon("address-book")),
-                menuItem("Мерки", tabName = "measurements", icon=icon("arrows-alt")),
-                menuItem("Заказы", tabName = "orders", icon = icon("archive")),
-                menuItem("Напоминалки", badgeLabel = "new", tabName = "reminder", icon = icon("paper-plane"))
-    )
-  ),
-  dashboardBody(
-    
-    tabItems(
-      
-      tabItem(tabName = 'stat',
-              fluidRow(infoBoxOutput("orderBox"),
-                       infoBoxOutput("revenueBox"),
-                       infoBoxOutput("clientBox")),
-              box(title = 'выручка', width = 13, status = "warning", collapsible = TRUE, solidHeader = FALSE,
-                  plotlyOutput("revenue_plot")),
-              fluidRow(box(title = 'Заказы', width = 12, status = "info", collapsible = TRUE,
-                           DT::dataTableOutput("orders_table"))),
-              fluidRow(box(title = 'Клиенты', width = 12, status = "info", collapsible = TRUE,
-                           DT::dataTableOutput("client_table")))
-              ),
-      
-      tabItem(tabName = 'clients',
-              fluidRow(box(title = "Новый клиент", width = 7, status = "primary", collapsible = TRUE, solidHeader = TRUE,
-                           style = "background-color:  #fffae6;",
-                           textInput("name", "имя клиента:"),
-                           textInput("address", "адрес клиента:"),
-                           textInput("email", "email клиента:"),
-                           radioButtons(inputId = "update_client", "обновить клиента?", 
-                                        c("да", "нет"), inline = TRUE, selected = "нет"),
-                           br(),
-                           actionButton("create_client", 'добавить клиента', icon = icon('address-book'),
-                                        style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
-              )), 
-              fluidRow(box(title='Мерки', width = 7, status = 'primary', collapsible=TRUE, collapsed = TRUE, solidHeader = TRUE,
-                           style = "background-color:  #fffae6;",
-                           uiOutput("customer_selector1"),
-                           textInput("height", "рост:"),
-                           textInput("chest_girth", "обхват груди:"),
-                           textInput("sleeve_length", "длина рукава:"),
-                           textInput("neck_girth", "обхват шеи:"),
-                           textInput("waist", "талия:"),
-                           textInput("biceps_girth", "обхват бицепса:"),
-                           textInput("head_girth", "обхват головы:"),
-                           textInput("wrist_girth", "обхват запястья:"),
-                           textInput("shoulder", "плечо:"),
-                           textInput("info", "заметки:"),
-                           radioButtons(inputId = "update_measurements", "обновить мерки?", 
-                                        c("да", "нет"), inline = TRUE, selected = "нет"),
-                           br(),
-                           actionButton("create_measurements", ' добавить мерки', icon = icon('user-edit'),
-                                        style="color: #fff; background-color: #337ab7; border-color: #2e6da4")))
-      ),
-      
-      tabItem(tabName = 'measurements',
-              fluidRow(box(title='мерки клиентов', width = 12, status= 'primary',style = "background-color:  #fffae6;",
-                           DT::dataTableOutput("measurements_table")))),
-      
-      tabItem(tabName = 'orders',
-             box(title = 'Новый заказ', width = 5, status = 'warning', collapsible = TRUE, solidHeader = FALSE,
-                           uiOutput("customer_selector2"),
-                           uiOutput("item_selector"),
-                           uiOutput("material_selector"),
-                           uiOutput("color_selector"),
-                           textInput('quantity', label='количество'),
-                           textInput('price', label='цена'),
-                           textInput('notes', label='заметки'),
-                           br(),
-                           actionButton("create_order", ' добавить заказ', icon = icon('cart-arrow-down'),
-                                        style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
-                           ),
-             box(title = 'обновить заказ',  width = 5, status = 'warning', collapsible = TRUE, solidHeader = FALSE,
-                 uiOutput("order"),
-                 selectInput('status', label='выбрать статус', 
-                             choices = c('готов', 'ждет оплаты', 'в производстве', 'отправлен'), 
-                             selected = 'ждет оплаты'),
-                 uiOutput("postal"),
-                 radioButtons(inputId = "delete", "удалить заказ?", 
-                              c("да", "нет"), inline = TRUE, selected = "нет"),
-                 br(),
-                 actionButton("update_order", ' обновить заказ', icon = icon('cart-arrow-down'),
-                              style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
-             )
-      ),
-      
-      tabItem(tabName = 'reminder', 
-              box(title = 'Создать напоминание', width = 5, status = 'primary', solidHeader = FALSE,
-                  dateInput("started_at", label = "начать показ", value = Sys.Date()),
-                  dateInput("finished_at", label = "закончить показ", value = Sys.Date()+2),
-                  textInput('author', label='автор'),
-                  textInput('message', label='сообщение'),
-                  radioButtons(inputId = "delete_reminder", "удалить напоминание?", 
-                               c("да", "нет"), inline = TRUE, selected = "нет"),
-                  actionButton("create_reminder", 'создать напоминание', icon = icon('"paper-plane"'),
-                               style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
-                  ))
-    )
-  )
+                    dashboardHeader(title='Atelier CRM',
+                                    dropdownMenuOutput("reminder")),
+                    dashboardSidebar(
+                      sidebarMenu(
+                        convertMenuItem(menuItem("Статистика", tabName = "stat", icon = icon("calculator"),
+                                                 
+                                                 selectInput('grouper', label='поле группировки', 
+                                                             choices = c('клиент', 'вещь', 'дата'), 
+                                                             selected = 'клиент'),
+                                                 dateRangeInput(inputId="period",
+                                                                label = "Period:",
+                                                                start = Sys.Date() - 28,
+                                                                end = Sys.Date() + 1,
+                                                                min = "2018-05-01",
+                                                                max = NULL,
+                                                                separator = "")
+                                                 
+                        ), "stat"),
+                        menuItem("Клиенты", tabName = "clients", icon = icon("address-book")),
+                        menuItem("Мерки", tabName = "measurements", icon=icon("arrows-alt")),
+                        menuItem("Заказы", tabName = "orders", icon = icon("archive")),
+                        menuItem("Напоминалки", badgeLabel = "new", tabName = "reminder", icon = icon("paper-plane"))
+                      )
+                    ),
+                    dashboardBody(
+                      
+                      tabItems(
+                        
+                        tabItem(tabName = 'stat',
+                                fluidRow(infoBoxOutput("orderBox"),
+                                         infoBoxOutput("revenueBox"),
+                                         infoBoxOutput("clientBox")),
+                                box(title = 'выручка', width = 13, status = "warning", collapsible = TRUE, solidHeader = FALSE,
+                                    plotlyOutput("revenue_plot")),
+                                fluidRow(box(title = 'Заказы', width = 12, status = "info", collapsible = TRUE,
+                                             DT::dataTableOutput("orders_table"))),
+                                fluidRow(box(title = 'Клиенты', width = 12, status = "info", collapsible = TRUE,
+                                             DT::dataTableOutput("client_table")))
+                        ),
+                        
+                        tabItem(tabName = 'clients',
+                                fluidRow(box(title = "Новый клиент", width = 7, status = "primary", collapsible = TRUE, solidHeader = FALSE,
+                                             textInput("name", "имя клиента:"),
+                                             textInput("address", "адрес клиента:"),
+                                             textInput("email", "email клиента:"),
+                                             radioButtons(inputId = "update_client", "обновить клиента?", 
+                                                          c("да", "нет"), inline = TRUE, selected = "нет"),
+                                             br(),
+                                             actionButton("create_client", 'добавить клиента', icon = icon('address-book'),
+                                                          style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+                                )), 
+                                fluidRow(box(title='Мерки', width = 7, status = 'primary', collapsible=TRUE, collapsed = TRUE, solidHeader = FALSE,
+                                             uiOutput("customer_selector1"),
+                                             textInput("height", "рост:"),
+                                             textInput("chest_girth", "обхват груди:"),
+                                             textInput("sleeve_length", "длина рукава:"),
+                                             textInput("neck_girth", "обхват шеи:"),
+                                             textInput("waist", "талия:"),
+                                             textInput("biceps_girth", "обхват бицепса:"),
+                                             textInput("head_girth", "обхват головы:"),
+                                             textInput("wrist_girth", "обхват запястья:"),
+                                             textInput("shoulder", "плечо:"),
+                                             textInput("info", "заметки:"),
+                                             radioButtons(inputId = "update_measurements", "обновить мерки?", 
+                                                          c("да", "нет"), inline = TRUE, selected = "нет"),
+                                             br(),
+                                             actionButton("create_measurements", ' добавить мерки', icon = icon('user-edit'),
+                                                          style="color: #fff; background-color: #337ab7; border-color: #2e6da4")))
+                        ),
+                        
+                        tabItem(tabName = 'measurements',
+                                fluidRow(box(title='мерки клиентов', width = 12, status= 'primary',style = "background-color:  #fffae6;",
+                                             DT::dataTableOutput("measurements_table")))),
+                        
+                        tabItem(tabName = 'orders',
+                                box(title = 'Новый заказ', width = 5, status = 'warning', collapsible = TRUE, solidHeader = FALSE,
+                                    uiOutput("customer_selector2"),
+                                    uiOutput("item_selector"),
+                                    uiOutput("material_selector"),
+                                    uiOutput("color_selector"),
+                                    selectInput('quantity', label='количество', choices = 1:20),
+                                    textInput('price', label='цена'),
+                                    textInput('notes', label='заметки'),
+                                    br(),
+                                    actionButton("create_order", ' добавить заказ', icon = icon('cart-arrow-down'),
+                                                 style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+                                ),
+                                box(title = 'обновить заказ',  width = 5, status = 'warning', collapsible = TRUE, solidHeader = FALSE,
+                                    uiOutput("order"),
+                                    selectInput('status', label='выбрать статус', 
+                                                choices = c('готов', 'ждет оплаты', 'в производстве', 'отправлен'), 
+                                                selected = 'ждет оплаты'),
+                                    uiOutput("postal"),
+                                    radioButtons(inputId = "delete", "удалить заказ?", 
+                                                 c("да", "нет"), inline = TRUE, selected = "нет"),
+                                    br(),
+                                    actionButton("update_order", ' обновить заказ', icon = icon('cart-arrow-down'),
+                                                 style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+                                )
+                        ),
+                        
+                        tabItem(tabName = 'reminder', 
+                                box(title = 'Создать напоминание', width = 5, status = 'primary', solidHeader = FALSE,
+                                    dateInput("started_at", label = "начать показ", value = Sys.Date()),
+                                    dateInput("finished_at", label = "закончить показ", value = Sys.Date()+2),
+                                    textInput('author', label='автор'),
+                                    textInput('message', label='сообщение'),
+                                    radioButtons(inputId = "delete_reminder", "удалить напоминание?", 
+                                                 c("да", "нет"), inline = TRUE, selected = "нет"),
+                                    actionButton("create_reminder", 'создать напоминание', icon = icon('"paper-plane"'),
+                                                 style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+                                ))
+                      )
+                    )
 )
 
 
@@ -178,7 +176,7 @@ server <- function(input, output, session) {
     if (input$status == "отправлен") 
       textInput("postal_code", "почтовый код")
   })
-
+  
   output$client_table <- DT::renderDataTable(DT::datatable({
     leftb <- as.character(input$period[1])
     rightb <- as.character(input$period[2])
@@ -213,12 +211,12 @@ server <- function(input, output, session) {
     grp <- as.name(group_ptr[[input$grouper]])
     data <- global_pool %>% tbl('orders') %>% filter(created_at >= leftb & created_at <= rightb & status != 'ждет оплаты') %>% 
       group_by(grp) %>% summarise(revenue = sum(price*quantity)) %>% collect()
-
+    
     if (grp == 'created_at') {
       
       data$created_at <- as.Date(as.POSIXct(data$created_at, format="%Y-%m-%d", tz = "GMT"))
       graph = plot_ly(data, x = data$created_at, y = data$revenue, type = "bar") %>%
-                      layout(yaxis = list(title = 'Выручка по дням', autosize = FALSE))
+        layout(yaxis = list(title = 'Выручка по дням', autosize = FALSE))
       graph$elementId = NULL
       
     } else {
@@ -256,7 +254,7 @@ server <- function(input, output, session) {
     today <- Sys.Date()
     messageData <- global_pool %>% tbl("reminder") %>% 
       filter(finished_at >= today & started_at <= today) %>% 
-       arrange(desc(finished_at)) %>% select(author, message) %>% collect()
+      arrange(desc(finished_at)) %>% select(author, message) %>% collect()
     print(messageData)
     if (nrow(messageData) > 0) {
       msgs <- apply(messageData, 1, function(row) {
@@ -298,7 +296,7 @@ server <- function(input, output, session) {
       ))
       
     }
-      
+    
   })
   
   observeEvent(input$create_order, {
@@ -307,7 +305,9 @@ server <- function(input, output, session) {
       listed_input <- reactiveValuesToList(input)
       listed_input <- listed_input[names(listed_input) != 'order_id']
       listed_input$order_hash <- digest(to_hash, algo="md5", serialize=F)
+      listed_input$event <- 'ждет оплаты'
       insertRow(global_pool, 'orders', listed_input)
+      insertRow(global_pool, 'eventlog', listed_input)
       order_list <<- updateSelector('orders', 'none', all=TRUE)
       updateTextInput(session, "price", value = '')
       updateTextInput(session, "quantity", value = '')
@@ -315,7 +315,7 @@ server <- function(input, output, session) {
         title = "создан новый заказ",
         easyClose = TRUE, footer = NULL
       ))
-      }
+    }
   })
   
   observeEvent(input$create_measurements, {
@@ -346,12 +346,12 @@ server <- function(input, output, session) {
         filter(order_id == input$order_id) %>% select('order_hash') %>% collect()
       listed_input <- reactiveValuesToList(input)
       listed_input$order_hash <- order_hash$order_hash
-      
+      listed_input$event <- listed_input$status
       
       if (input$status == 'отправлен') {
         if (input$postal_code != '') {
           updateRow(listed_input, global_pool, 'orders', id_field='order_hash', to_update=c('status', 'postal_code'))
-          
+          insertRow(global_pool, 'eventlog', listed_input)
           showModal(modalDialog(
             title = "статус заказа обновлен",
             easyClose = TRUE, footer = NULL
@@ -367,13 +367,13 @@ server <- function(input, output, session) {
         }
       } else {
         updateRow(listed_input, global_pool, 'orders', id_field='order_hash', to_update=c('status'))
-        
+        insertRow(global_pool, 'eventlog', listed_input)
         showModal(modalDialog(
           title = "статус заказа обновлен",
           easyClose = TRUE, footer = NULL
         ))
       }
-  
+      
     } else {
       updateRow(input, global_pool, 'orders', id_field='order_id', delete=TRUE)
       showModal(modalDialog(

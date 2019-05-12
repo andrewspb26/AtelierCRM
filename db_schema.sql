@@ -53,3 +53,12 @@ create table reminder (
   finished_at datetime
   
 );
+
+create table eventlog (
+  
+  event_id integer PRIMARY KEY AUTOINCREMENT,
+  order_hash text,
+  event text,
+  created_at datetime default current_timestamp
+  
+);
