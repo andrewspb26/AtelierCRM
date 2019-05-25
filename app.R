@@ -57,8 +57,12 @@ ui <- dashboardPage(skin = 'purple',
                                     plotlyOutput("revenue_plot")),
                                 fluidRow(box(title = 'Заказы', width = 12, status = "info", collapsible = TRUE,
                                              DT::dataTableOutput("orders_table"))),
-                                fluidRow(box(title = 'Клиенты', width = 12, status = "info", collapsible = TRUE,
-                                             DT::dataTableOutput("client_table")))
+                                fluidRow(
+                                  box(title = 'Клиенты', width = 6, status = "info", collapsible = TRUE,
+                                             DT::dataTableOutput("client_table")),
+                                  box(title = 'Посылки', width = 6, status = "info", collapsible = TRUE,
+                                      DT::dataTableOutput("sent_table"))
+                                  )
                         ),
                         
                         tabItem(tabName = 'clients',
@@ -190,13 +194,34 @@ server <- function(input, output, session) {
     leftb <- as.character(input$period[1])
     rightb <- as.character(input$period[2])
     data <- global_pool %>% tbl('orders') %>% filter(created_at >= leftb & created_at <= rightb) %>% 
-      select(everything(), -one_of(c('order_hash'))) %>% arrange(desc(created_at)) %>% collect()
+      select(everything(), -one_of(c('order_hash', 'postal_code'))) %>% arrange(desc(created_at)) %>% collect()
     rvalues$n_orders <- nrow(data)
     revenue <- data %>% filter(status != 'ждет оплаты') %>% summarise(rev = sum(price*quantity)) %>% collect()
     rvalues$revenue <- revenue$rev
     data
   }, rownames = FALSE, filter = "top", options = list(scroller = TRUE, scrollX = TRUE)))
   
+  output$sent_table <- DT::renderDataTable(DT::datatable({
+    leftb <- as.character(input$period[1])
+    pc <- global_pool %>% 
+      tbl('orders') %>% 
+      filter(postal_code != '') %>%
+      select(user_name, order_hash, postal_code) %>%
+      distinct()
+    
+    st <- global_pool %>% 
+      tbl('eventlog') %>% 
+      filter(event=='отправлен' & created_at >= leftb) %>% 
+      select(order_hash, created_at) %>% 
+      group_by(order_hash) %>% 
+      summarize(created_at = max(created_at)) 
+    
+    df <- inner_join(pc, st, by='order_hash') %>%
+      select(user_name, created_at, postal_code) %>%
+      arrange(desc(created_at)) %>% collect()
+    
+    df
+  }, rownames = FALSE, filter = "top", options = list(scroller = TRUE, scrollX = TRUE)))
   
   output$measurements_table <- DT::renderDataTable(DT::datatable({
     data <- global_pool %>% tbl('measurements') %>% select(everything()) %>% collect()
@@ -340,44 +365,54 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$update_order, {
-    
-    if (input$delete == 'нет'){
-      order_hash <- global_pool %>% tbl('orders') %>% 
-        filter(order_id == input$order_id) %>% select('order_hash') %>% collect()
-      listed_input <- reactiveValuesToList(input)
-      listed_input$order_hash <- order_hash$order_hash
-      listed_input$event <- listed_input$status
-      
-      if (input$status == 'отправлен') {
-        if (input$postal_code != '') {
-          updateRow(listed_input, global_pool, 'orders', id_field='order_hash', to_update=c('status', 'postal_code'))
+    if (input$order_id != '') {
+      if (input$delete == 'нет'){
+        order_hash <- global_pool %>% tbl('orders') %>% 
+          filter(order_id == input$order_id) %>% select('order_hash') %>% collect()
+        listed_input <- reactiveValuesToList(input)
+        listed_input$order_hash <- order_hash$order_hash
+        listed_input$event <- listed_input$status
+        
+        if (input$status == 'отправлен') {
+          if (input$postal_code != '') {
+            updateRow(listed_input, global_pool, 'orders', id_field='order_hash', to_update=c('status', 'postal_code'))
+            insertRow(global_pool, 'eventlog', listed_input)
+            updateTextInput(session, "status", value = 'ждет оплаты')
+            updateTextInput(session, "order_id", value = '')
+            showModal(modalDialog(
+              title = "статус заказа обновлен",
+              easyClose = TRUE, footer = NULL
+            ))
+            
+          } else {
+            
+            showModal(modalDialog(
+              title = "необходим почтовый код",
+              easyClose = TRUE, footer = NULL
+            ))
+            
+          }
+        } else {
+          updateRow(listed_input, global_pool, 'orders', id_field='order_hash', to_update=c('status'))
           insertRow(global_pool, 'eventlog', listed_input)
+          updateTextInput(session, "status", value = 'ждет оплаты')
+          updateTextInput(session, "order_id", value = '')
           showModal(modalDialog(
             title = "статус заказа обновлен",
             easyClose = TRUE, footer = NULL
           ))
-          
-        } else {
-          
-          showModal(modalDialog(
-            title = "необходим почтовый код",
-            easyClose = TRUE, footer = NULL
-          ))
-          
         }
+        
       } else {
-        updateRow(listed_input, global_pool, 'orders', id_field='order_hash', to_update=c('status'))
-        insertRow(global_pool, 'eventlog', listed_input)
+        updateRow(input, global_pool, 'orders', id_field='order_id', delete=TRUE)
         showModal(modalDialog(
-          title = "статус заказа обновлен",
+          title = "заказ удален",
           easyClose = TRUE, footer = NULL
         ))
       }
-      
     } else {
-      updateRow(input, global_pool, 'orders', id_field='order_id', delete=TRUE)
       showModal(modalDialog(
-        title = "заказ удален",
+        title = "необходим идентификатор",
         easyClose = TRUE, footer = NULL
       ))
     }
