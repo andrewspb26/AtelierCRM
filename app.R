@@ -66,17 +66,35 @@ ui <- dashboardPage(skin = 'purple',
                         ),
                         
                         tabItem(tabName = 'clients',
-                                fluidRow(box(title = "Новый клиент", width = 7, status = "primary", collapsible = TRUE, solidHeader = FALSE,
-                                             textInput("name", "имя клиента:"),
-                                             textInput("address", "адрес клиента:"),
-                                             textInput("email", "email клиента:"),
-                                             radioButtons(inputId = "update_client", "обновить клиента?", 
-                                                          c("да", "нет"), inline = TRUE, selected = "нет"),
-                                             br(),
-                                             actionButton("create_client", 'добавить клиента', icon = icon('address-book'),
-                                                          style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
-                                )), 
-                                fluidRow(box(title='Мерки', width = 7, status = 'primary', collapsible=TRUE, collapsed = TRUE, solidHeader = FALSE,
+                                fluidRow(
+                                  box(title = "Поиск", width = 12, status = "primary", collapsible = TRUE, solidHeader = FALSE,
+                                      fluidRow(
+                                        column(12, align="center",
+                                               uiOutput("customer_selector3"),
+                                               actionButton("search", 'найти', icon = icon('address-book'),
+                                                            style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+                                        )
+                                      ),
+                                      br(),
+                                      box(status = "primary", width = 12,
+                                        DT::dataTableOutput("address"),
+                                        br(),
+                                        DT::dataTableOutput("client_orders")
+                                      )
+                                  )
+                                ), 
+                                fluidRow(
+                                  box(title = "Новый клиент", width = 6, status = "primary", collapsible = TRUE, collapsed = TRUE, solidHeader = FALSE,
+                                      textInput("name", "имя клиента:"),
+                                      textInput("address", "адрес клиента:"),
+                                      textInput("email", "email клиента:"),
+                                      radioButtons(inputId = "update_client", "обновить клиента?", 
+                                                   c("да", "нет"), inline = TRUE, selected = "нет"),
+                                      br(),
+                                      actionButton("create_client", 'добавить клиента', icon = icon('address-book'),
+                                                   style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+                                  ),
+                                  box(title='Мерки', width = 6, status = 'primary', collapsible=TRUE, collapsed = TRUE, solidHeader = FALSE,
                                              uiOutput("customer_selector1"),
                                              textInput("height", "рост:"),
                                              textInput("chest_girth", "обхват груди:"),
@@ -158,6 +176,10 @@ server <- function(input, output, session) {
   
   output$customer_selector2 <- renderUI({
     selectInput('user_name', label='имя клиента', choices = client_list)
+  })
+  
+  output$customer_selector3 <- renderUI({
+    selectInput('searchable_name', label='имя клиента', choices = client_list, width='350px')
   })
   
   output$item_selector <- renderUI({
@@ -445,6 +467,21 @@ server <- function(input, output, session) {
         title = "не все поля заполены",
         easyClose = TRUE, footer = NULL
       ))
+    }
+  })
+  
+  observeEvent(input$search, {
+    if (input$searchable_name != ''){
+      output$client_orders <- DT::renderDataTable(DT::datatable({
+        data <- global_pool %>% tbl('orders') %>% filter(user_name == input$searchable_name) %>% 
+          select(everything(), -one_of(c('order_hash'))) %>% arrange(desc(created_at)) %>% collect()
+        data
+      }, rownames = FALSE, options = list(scroller = TRUE, scrollX = TRUE)))
+      output$address <- DT::renderDataTable(DT::datatable({
+        data <- global_pool %>% tbl('clients') %>% filter(name == input$searchable_name) %>% 
+          select(everything(), -one_of(c('id'))) %>% collect()
+        data
+      }, rownames = FALSE, options = list(scroller = TRUE, scrollX = TRUE)))
     }
   })
   
